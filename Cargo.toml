@@ -1,0 +1,21 @@
+[package]
+name = "blvm-muhash"
+version = "0.1.0"
+edition = "2021"
+authors = ["Bitcoin Commons Team"]
+description = "MuHash3072 for Bitcoin UTXO set hashing"
+license = "MIT"
+repository = "https://github.com/BTCDecoded/blvm-muhash"
+keywords = ["bitcoin", "muhash", "utxo", "coinstats"]
+categories = ["cryptography::cryptocurrencies"]
+rust-version = "1.82"
+
+[lib]
+name = "blvm_muhash"
+path = "src/lib.rs"
+
+[dependencies]
+sha2 = "0.10"
+hex = "0.4"
+chacha20 = "0.9"
+cipher = "0.4"
