@@ -1,5 +1,10 @@
 # blvm-muhash
 
+[![crates.io](https://img.shields.io/crates/v/blvm-muhash.svg)](https://crates.io/crates/blvm-muhash)
+[![docs.rs](https://docs.rs/blvm-muhash/badge.svg)](https://docs.rs/blvm-muhash)
+[![CI](https://github.com/BTCDecoded/blvm-muhash/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/BTCDecoded/blvm-muhash/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 MuHash3072 for Bitcoin UTXO set hashing. Matches Bitcoin Core `gettxoutsetinfo` muhash output for AssumeUTXO compatibility.
 
 ## Features
