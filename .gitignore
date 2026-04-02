@@ -1,1 +1,3 @@
 /target
+# Library crate: lockfile not committed
+Cargo.lock
