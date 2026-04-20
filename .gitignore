@@ -1,3 +1,8 @@
 /target
 # Library crate: lockfile not committed
 Cargo.lock
+# cargo-fuzz (if present)
+fuzz/target/
+fuzz/Cargo.lock
+fuzz/artifacts/
+fuzz/corpus/

@@ -1,0 +1,29 @@
+[package]
+name = "blvm-muhash-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+blvm-muhash = { path = ".." }
+libfuzzer-sys = "0.4"
+
+[profile.release]
+opt-level = 3
+
+[[bin]]
+name = "muhash_roll"
+path = "fuzz_targets/muhash_roll.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "muhash_num3072"
+path = "fuzz_targets/muhash_num3072.rs"
+test = false
+doc = false
+bench = false

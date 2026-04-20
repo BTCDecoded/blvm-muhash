@@ -66,9 +66,69 @@ jobs:
           fi
           cargo fmt -- --check
 
+  fuzz:
+    name: Fuzz (${{ matrix.target }})
+    needs: test
+    runs-on: [self-hosted, Linux, X64, builds]
+    timeout-minutes: 20
+    if: |
+      github.event_name != 'push' ||
+      github.event.head_commit == null ||
+      (!contains(github.event.head_commit.message, '[skip ci]') &&
+       !contains(github.event.head_commit.message, '[ci skip]') &&
+       !contains(github.event.head_commit.message, '[no ci]'))
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        target:
+          - muhash_num3072
+          - muhash_roll
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Strip [patch.crates-io] for crates.io-only CI
+        uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
+
+      - name: Clean CARGO_HOME (skip runner global rustflags)
+        run: |
+          CI_CARGO_HOME="${RUNNER_TEMP:-/tmp}/cargo-home-ci"
+          mkdir -p "$CI_CARGO_HOME"
+          [ -d "$HOME/.cargo/registry" ] && ln -sfn "$HOME/.cargo/registry" "$CI_CARGO_HOME/registry"
+          [ -d "$HOME/.cargo/git" ] && ln -sfn "$HOME/.cargo/git" "$CI_CARGO_HOME/git"
+          echo "CARGO_HOME=$CI_CARGO_HOME" >> "$GITHUB_ENV"
+
+      - name: Install Rust
+        uses: BTCDecoded/rust-ci/install-rust-toolchain@main
+        with:
+          toolchain: 1.89.0
+
+      - name: Install nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo install cargo-fuzz
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+
+      - name: Initialize corpus dirs
+        working-directory: fuzz
+        run: |
+          chmod +x init_corpus.sh
+          ./init_corpus.sh
+
+      - name: Run cargo-fuzz (${{ matrix.target }})
+        working-directory: fuzz
+        env:
+          RUSTFLAGS: "-Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4"
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          timeout 240 cargo +nightly fuzz run "${{ matrix.target }}" -- -max_total_time=120 -timeout=10 -max_len=100000
+
   publish:
     name: Release & publish
-    needs: test
+    needs: [test, fuzz]
     runs-on: [self-hosted, Linux, X64, builds]
     if: |
       github.event_name == 'push' &&
