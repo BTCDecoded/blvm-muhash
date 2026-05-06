@@ -118,10 +118,13 @@ jobs:
           chmod +x init_corpus.sh
           ./init_corpus.sh
 
+      # cargo-fuzz links with ASAN + sancov; rust-lld can fail with
+      # "relocation refers to a discarded section: .text.sancov.module_ctor_*".
+      # Force BFD (ld.bfd) via the C linker — self-hosted runners usually have binutils.
       - name: Run cargo-fuzz (${{ matrix.target }})
         working-directory: fuzz
         env:
-          RUSTFLAGS: "-Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4"
+          RUSTFLAGS: "-Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4 -Clink-arg=-fuse-ld=bfd"
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           timeout 240 cargo +nightly fuzz run "${{ matrix.target }}" -- -max_total_time=120 -timeout=10 -max_len=100000
