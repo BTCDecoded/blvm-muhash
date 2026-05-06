@@ -82,9 +82,7 @@ fn mut_api_matches_value_api() {
     ];
 
     // Inserts only.
-    let value_form = coins
-        .iter()
-        .fold(MuHash3072::new(), |acc, c| acc.insert(c));
+    let value_form = coins.iter().fold(MuHash3072::new(), |acc, c| acc.insert(c));
     let mut mut_form = MuHash3072::new();
     for c in coins.iter() {
         mut_form.insert_mut(c);
