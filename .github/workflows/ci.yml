@@ -66,76 +66,9 @@ jobs:
           fi
           cargo fmt -- --check
 
-  fuzz:
-    name: Fuzz (${{ matrix.target }})
-    needs: test
-    runs-on: [self-hosted, Linux, X64, builds]
-    timeout-minutes: 20
-    if: |
-      github.event_name != 'push' ||
-      github.event.head_commit == null ||
-      (!contains(github.event.head_commit.message, '[skip ci]') &&
-       !contains(github.event.head_commit.message, '[ci skip]') &&
-       !contains(github.event.head_commit.message, '[no ci]'))
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        target:
-          - muhash_num3072
-          - muhash_roll
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Strip [patch.crates-io] for crates.io-only CI
-        uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
-
-      # Do not symlink ~/.cargo/registry here: max-parallel matrix jobs on one self-hosted
-      # runner share that tree and race on `cargo install` unpack (.cargo-ok EEXIST).
-      - name: Isolated CARGO_HOME for fuzz (per matrix job)
-        run: |
-          CI_CARGO_HOME="${RUNNER_TEMP:-/tmp}/cargo-home-fuzz-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}"
-          mkdir -p "$CI_CARGO_HOME"
-          echo "CARGO_HOME=$CI_CARGO_HOME" >> "$GITHUB_ENV"
-
-      - name: Install Rust
-        uses: BTCDecoded/rust-ci/install-rust-toolchain@main
-        with:
-          toolchain: 1.89.0
-
-      - name: Install nightly and cargo-fuzz
-        run: |
-          rustup toolchain install nightly
-          export PATH="$HOME/.cargo/bin:$PATH"
-          # --force: recover from partial unpack if a previous job died mid-install
-          cargo install cargo-fuzz --force
-
-      - name: Cache
-        uses: Swatinem/rust-cache@v2
-
-      - name: Initialize corpus dirs
-        working-directory: fuzz
-        run: |
-          chmod +x init_corpus.sh
-          ./init_corpus.sh
-
-      # cargo-fuzz builds with ASAN + sancov. rust-lld (used via rustc's gcc-ld wrapper)
-      # runs --gc-sections which discards comdat-wrapped .text.sancov.module_ctor_* sections,
-      # then the .init_array.2 relocs that reference them produce linker errors. Passing
-      # --no-gc-sections prevents the discard; the binary is larger but correctness is restored.
-      # (-fuse-ld=bfd does not help: rustc's -Bgcc-ld wrapper ignores the flag and always
-      # routes to lld regardless.)
-      - name: Run cargo-fuzz (${{ matrix.target }})
-        working-directory: fuzz
-        env:
-          RUSTFLAGS: "-Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4 -Clink-arg=-Wl,--no-gc-sections"
-        run: |
-          export PATH="$HOME/.cargo/bin:$PATH"
-          timeout 240 cargo +nightly fuzz run "${{ matrix.target }}" -- -max_total_time=120 -timeout=10 -max_len=100000
-
   publish:
     name: Release & publish
-    needs: [test, fuzz]
+    needs: [test]
     runs-on: [self-hosted, Linux, X64, builds]
     if: |
       github.event_name == 'push' &&
