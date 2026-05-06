@@ -8,6 +8,9 @@ use sha2::{Digest, Sha256};
 
 use crate::num3072::{Num3072, BYTE_SIZE};
 
+/// Serialized [`MuHash3072`] rolling state (numerator ‖ denominator). Persist between flushes for incremental IBD UTXO hashing.
+pub const MUHASH_RUNNING_STATE_BYTES: usize = BYTE_SIZE * 2;
+
 /// MuHash3072 state. Empty set: numerator=1, denominator=1.
 #[derive(Clone)]
 pub struct MuHash3072 {
@@ -53,6 +56,25 @@ impl MuHash3072 {
         self
     }
 
+    /// In-place insert. Hot-path equivalent of [`Self::insert`] without the value-semantics
+    /// move. The owning `insert(self) -> Self` form is convenient at call sites that don't
+    /// already have `&mut`, but it forces callers like
+    /// `*mh = mh.clone().insert(&pre)` to clone the running state on every row — which is
+    /// 768 B per row (two `Num3072`s) and dominates IBD-flush CPU at high heights.
+    ///
+    /// Mathematically identical to [`Self::insert`].
+    pub fn insert_mut(&mut self, data: &[u8]) {
+        let elem = to_num3072(data);
+        self.numerator.multiply(&elem);
+    }
+
+    /// In-place remove. See [`Self::insert_mut`] for the rationale.
+    /// Mathematically identical to [`Self::remove`].
+    pub fn remove_mut(&mut self, data: &[u8]) {
+        let elem = to_num3072(data);
+        self.denominator.multiply(&elem);
+    }
+
     /// Finalize to 32-byte hash. Consumes self.
     pub fn finalize(mut self) -> [u8; 32] {
         self.numerator.divide(&self.denominator);
@@ -77,6 +99,28 @@ impl MuHash3072 {
         self.numerator.multiply(&other.denominator);
         self.denominator.multiply(&other.numerator);
         self
+    }
+
+    /// Encode rolling numerator/denominator for persistence (not the finalized 32-byte muhash).
+    pub fn serialize_running_state(&self) -> [u8; MUHASH_RUNNING_STATE_BYTES] {
+        let mut out = [0u8; MUHASH_RUNNING_STATE_BYTES];
+        let mut num_buf = [0u8; BYTE_SIZE];
+        let mut den_buf = [0u8; BYTE_SIZE];
+        self.numerator.to_bytes(&mut num_buf);
+        self.denominator.to_bytes(&mut den_buf);
+        out[..BYTE_SIZE].copy_from_slice(&num_buf);
+        out[BYTE_SIZE..].copy_from_slice(&den_buf);
+        out
+    }
+
+    /// Decode [`serialize_running_state`] output.
+    pub fn deserialize_running_state(bytes: &[u8; MUHASH_RUNNING_STATE_BYTES]) -> Self {
+        let numerator = Num3072::from_bytes(bytes[..BYTE_SIZE].try_into().unwrap());
+        let denominator = Num3072::from_bytes(bytes[BYTE_SIZE..].try_into().unwrap());
+        MuHash3072 {
+            numerator,
+            denominator,
+        }
     }
 }
 
