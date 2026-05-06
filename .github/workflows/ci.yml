@@ -119,13 +119,16 @@ jobs:
           chmod +x init_corpus.sh
           ./init_corpus.sh
 
-      # cargo-fuzz links with ASAN + sancov; rust-lld can fail with
-      # "relocation refers to a discarded section: .text.sancov.module_ctor_*".
-      # Force BFD (ld.bfd) via the C linker — self-hosted runners usually have binutils.
+      # cargo-fuzz builds with ASAN + sancov. rust-lld (used via rustc's gcc-ld wrapper)
+      # runs --gc-sections which discards comdat-wrapped .text.sancov.module_ctor_* sections,
+      # then the .init_array.2 relocs that reference them produce linker errors. Passing
+      # --no-gc-sections prevents the discard; the binary is larger but correctness is restored.
+      # (-fuse-ld=bfd does not help: rustc's -Bgcc-ld wrapper ignores the flag and always
+      # routes to lld regardless.)
       - name: Run cargo-fuzz (${{ matrix.target }})
         working-directory: fuzz
         env:
-          RUSTFLAGS: "-Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4 -Clink-arg=-fuse-ld=bfd"
+          RUSTFLAGS: "-Cpasses=sancov-module -Cllvm-args=-sanitizer-coverage-level=4 -Clink-arg=-Wl,--no-gc-sections"
         run: |
           export PATH="$HOME/.cargo/bin:$PATH"
           timeout 240 cargo +nightly fuzz run "${{ matrix.target }}" -- -max_total_time=120 -timeout=10 -max_len=100000
