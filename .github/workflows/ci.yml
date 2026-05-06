@@ -90,12 +90,12 @@ jobs:
       - name: Strip [patch.crates-io] for crates.io-only CI
         uses: BTCDecoded/rust-ci/strip-patch-crates-io@main
 
-      - name: Clean CARGO_HOME (skip runner global rustflags)
+      # Do not symlink ~/.cargo/registry here: max-parallel matrix jobs on one self-hosted
+      # runner share that tree and race on `cargo install` unpack (.cargo-ok EEXIST).
+      - name: Isolated CARGO_HOME for fuzz (per matrix job)
         run: |
-          CI_CARGO_HOME="${RUNNER_TEMP:-/tmp}/cargo-home-ci"
+          CI_CARGO_HOME="${RUNNER_TEMP:-/tmp}/cargo-home-fuzz-${{ matrix.target }}-${{ github.run_id }}-${{ github.run_attempt }}"
           mkdir -p "$CI_CARGO_HOME"
-          [ -d "$HOME/.cargo/registry" ] && ln -sfn "$HOME/.cargo/registry" "$CI_CARGO_HOME/registry"
-          [ -d "$HOME/.cargo/git" ] && ln -sfn "$HOME/.cargo/git" "$CI_CARGO_HOME/git"
           echo "CARGO_HOME=$CI_CARGO_HOME" >> "$GITHUB_ENV"
 
       - name: Install Rust
@@ -107,7 +107,8 @@ jobs:
         run: |
           rustup toolchain install nightly
           export PATH="$HOME/.cargo/bin:$PATH"
-          cargo install cargo-fuzz
+          # --force: recover from partial unpack if a previous job died mid-install
+          cargo install cargo-fuzz --force
 
       - name: Cache
         uses: Swatinem/rust-cache@v2
