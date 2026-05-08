@@ -15,7 +15,7 @@ name = "blvm_muhash"
 path = "src/lib.rs"
 
 [dependencies]
-sha2 = "0.10"
-hex = "0.4"
+sha2 = "=0.10.9"
+hex = "=0.4.3"
 chacha20 = "0.9"
 cipher = "0.4"
