@@ -269,11 +269,7 @@ struct SignedMatrix {
 }
 
 fn countr_zero(v: u64) -> u32 {
-    if v == 0 {
-        64
-    } else {
-        v.trailing_zeros()
-    }
+    if v == 0 { 64 } else { v.trailing_zeros() }
 }
 
 fn compute_divstep_matrix(eta: i32, f: i64, g: i64) -> (i32, SignedMatrix) {

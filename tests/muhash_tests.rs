@@ -1,6 +1,6 @@
 //! MuHash3072 tests.
 
-use blvm_muhash::{serialize_coin_for_muhash, MuHash3072, MUHASH_RUNNING_STATE_BYTES};
+use blvm_muhash::{MUHASH_RUNNING_STATE_BYTES, MuHash3072, serialize_coin_for_muhash};
 
 #[test]
 fn empty_set() {

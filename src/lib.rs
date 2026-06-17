@@ -18,5 +18,5 @@ pub mod muhash;
 pub mod num3072;
 
 pub use coin::serialize_coin_for_muhash;
-pub use muhash::{MuHash3072, MUHASH_RUNNING_STATE_BYTES};
+pub use muhash::{MUHASH_RUNNING_STATE_BYTES, MuHash3072};
 pub use num3072::Num3072;

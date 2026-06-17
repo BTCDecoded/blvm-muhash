@@ -2,11 +2,11 @@
 //!
 //! Matches Bitcoin Core gettxoutsetinfo muhash output.
 
-use chacha20::cipher::{KeyIvInit, StreamCipher};
 use chacha20::ChaCha20;
+use chacha20::cipher::{KeyIvInit, StreamCipher};
 use sha2::{Digest, Sha256};
 
-use crate::num3072::{Num3072, BYTE_SIZE};
+use crate::num3072::{BYTE_SIZE, Num3072};
 
 /// Serialized [`MuHash3072`] rolling state (numerator ‖ denominator). Persist between flushes for incremental IBD UTXO hashing.
 pub const MUHASH_RUNNING_STATE_BYTES: usize = BYTE_SIZE * 2;
