@@ -1,6 +1,6 @@
 [package]
 name = "blvm-muhash"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2024"
 authors = ["Bitcoin Commons Team"]
 description = "MuHash3072 for Bitcoin UTXO set hashing"
