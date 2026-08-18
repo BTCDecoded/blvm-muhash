@@ -111,3 +111,30 @@ fn mut_api_matches_value_api() {
         mut_form.serialize_running_state()
     );
 }
+
+#[test]
+fn multiply_mut_matches_serial_insert_shards() {
+    // E2.3 export path: per-shard MuHash + multiply_mut ≡ one serial insert stream.
+    let coins: Vec<Vec<u8>> = (0..64u8)
+        .map(|i| {
+            serialize_coin_for_muhash(&[i; 32], i as u32, 100 + i as u32, false, i as i64, &[0x51])
+        })
+        .collect();
+    let mut serial = MuHash3072::new();
+    for c in &coins {
+        serial.insert_mut(c);
+    }
+    let mut a = MuHash3072::new();
+    let mut b = MuHash3072::new();
+    for c in &coins[..32] {
+        a.insert_mut(c);
+    }
+    for c in &coins[32..] {
+        b.insert_mut(c);
+    }
+    let via_value = a.clone().multiply(&b);
+    let mut via_mut = a;
+    via_mut.multiply_mut(&b);
+    assert_eq!(serial.clone().finalize(), via_value.clone().finalize());
+    assert_eq!(serial.finalize(), via_mut.finalize());
+}

@@ -94,6 +94,12 @@ impl MuHash3072 {
         self
     }
 
+    /// In-place union with `other` (same as [`Self::multiply`] without moving `self`).
+    pub fn multiply_mut(&mut self, other: &MuHash3072) {
+        self.numerator.multiply(&other.numerator);
+        self.denominator.multiply(&other.denominator);
+    }
+
     /// Divide by another MuHash (difference of sets). For parallel/merge use.
     pub fn divide(mut self, other: &MuHash3072) -> Self {
         self.numerator.multiply(&other.denominator);
