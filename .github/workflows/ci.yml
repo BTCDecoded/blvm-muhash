@@ -67,9 +67,80 @@ jobs:
           fi
           cargo fmt -- --check
 
+  fuzz:
+    name: Fuzz
+    runs-on: [self-hosted, Linux, X64, builds]
+    timeout-minutes: 30
+    if: |
+      github.event_name != 'push' ||
+      github.event.head_commit == null ||
+      (!contains(github.event.head_commit.message, '[skip ci]') &&
+       !contains(github.event.head_commit.message, '[ci skip]') &&
+       !contains(github.event.head_commit.message, '[no ci]'))
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Clean CARGO_HOME (skip runner global rustflags)
+        run: |
+          CI_CARGO_HOME="${RUNNER_TEMP:-/tmp}/cargo-home-ci"
+          mkdir -p "$CI_CARGO_HOME"
+          [ -d "$HOME/.cargo/registry" ] && ln -sfn "$HOME/.cargo/registry" "$CI_CARGO_HOME/registry"
+          [ -d "$HOME/.cargo/git" ] && ln -sfn "$HOME/.cargo/git" "$CI_CARGO_HOME/git"
+          echo "CARGO_HOME=$CI_CARGO_HOME" >> "$GITHUB_ENV"
+
+      - name: Install Rust
+        uses: BTCDecoded/rust-ci/install-rust-toolchain@main
+        with:
+          toolchain: 1.88.0
+
+      - name: Install nightly and cargo-fuzz
+        run: |
+          rustup toolchain install nightly
+          export PATH="$HOME/.cargo/bin:$PATH"
+          command -v cargo-fuzz >/dev/null 2>&1 || cargo +nightly install cargo-fuzz --locked
+
+      - name: Initialize corpus dirs
+        working-directory: fuzz
+        run: |
+          chmod +x init_corpus.sh
+          ./init_corpus.sh
+
+      # cargo-fuzz injects sancov + ASAN; do not set RUSTFLAGS here.
+      - name: Build fuzz binaries
+        working-directory: fuzz
+        env:
+          RUSTFLAGS: ''
+        run: |
+          export PATH="$HOME/.cargo/bin:$PATH"
+          cargo +nightly fuzz build
+
+      - name: Run all libFuzzer binaries in parallel
+        working-directory: fuzz
+        env:
+          ASAN_OPTIONS: detect_odr_violation=0
+        run: |
+          mapfile -t bins < <(grep -v '^#' TARGETS.md | grep -v '^$' || true)
+          JOBS=$(nproc)
+          echo "Running ${#bins[@]} fuzz targets across $JOBS cores in parallel"
+          RUNSCRIPT=$(mktemp /tmp/fuzz-run-XXXXXX.sh)
+          cat > "$RUNSCRIPT" << 'SCRIPT'
+          #!/usr/bin/env bash
+          t=$1
+          bin="$PWD/target/x86_64-unknown-linux-gnu/release/$t"
+          if [ ! -x "$bin" ]; then echo "missing: $bin"; exit 1; fi
+          echo "▶ $t"
+          timeout 210 "$bin" "corpus/$t" -- -max_total_time=60 -timeout=10 -max_len=100000 2>&1 | tail -3
+          echo "ok $t"
+          SCRIPT
+          chmod +x "$RUNSCRIPT"
+          printf '%s\n' "${bins[@]}" | xargs -P"$JOBS" -I{} bash "$RUNSCRIPT" {}
+          EXIT=$?
+          rm -f "$RUNSCRIPT"
+          exit $EXIT
+
   publish:
     name: Release & publish
-    needs: [test]
+    needs: [test, fuzz]
     runs-on: [self-hosted, Linux, X64, builds]
 
     if: |
